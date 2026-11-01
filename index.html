@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recent SMS and Ranges</title>
+    <title>Lamix SMS Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Firebase SDK Modular v10 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAyOW3nIcnzfD5AHImlc4jNy_ZtFH8Gy3Q",
@@ -27,77 +27,75 @@
         window.db = db;
         window.ref = ref;
         window.set = set;
-        window.push = push;
         window.onValue = onValue;
     </script>
 </head>
-<body class="bg-gray-100 text-gray-800 min-h-screen font-sans antialiased">
+<body class="bg-gray-100 text-gray-800 min-h-screen font-sans text-xs">
 
-    <div class="max-w-7xl mx-auto px-4 py-6 space-y-5">
-        <!-- Header -->
-        <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-gray-200 rounded-lg p-4 shadow-sm gap-3">
+    <div class="max-w-7xl mx-auto px-3 py-4 space-y-4">
+        <!-- Header like Lamix Panel -->
+        <header class="bg-white border border-gray-300 rounded shadow-sm p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div>
-                <h1 class="text-lg font-bold text-gray-900 tracking-tight">Recent SMS and Ranges</h1>
-                <p class="text-xs text-gray-500">Live synchronized dashboard & permanent reports.</p>
+                <h1 class="text-sm font-bold text-gray-900">Lamix SMS Dashboard</h1>
+                <p class="text-[11px] text-gray-500">Messages received on test numbers.</p>
             </div>
             <div class="flex items-center gap-2">
-                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-                    <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Live
-                </span>
-                <button onclick="fetchCDRs()" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-xs font-medium transition shadow-sm">
-                    Refresh
+                <span class="px-2 py-1 bg-blue-600 text-white font-semibold rounded text-[11px]">SMS Test Report</span>
+                <span class="px-2 py-1 bg-gray-100 text-gray-700 border border-gray-300 rounded text-[11px]">SMS Test Numbers</span>
+                <button onclick="fetchCDRs()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded font-medium transition flex items-center gap-1 shadow-sm">
+                    ↻ Refresh
                 </button>
             </div>
         </header>
 
         <!-- Main Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             
-            <!-- Section 1: Recent Ranges & Pagination -->
-            <div class="bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col">
-                <div class="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                    <h2 class="text-xs font-bold text-gray-700 uppercase tracking-wider">Ranges List</h2>
+            <!-- Section 1: Recent Inbound Ranges List -->
+            <div class="bg-white border border-gray-300 rounded shadow-sm flex flex-col">
+                <div class="px-3 py-2 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                    <h2 class="font-bold text-gray-700 uppercase">Recent Inbound</h2>
                     <div class="flex items-center gap-2">
-                        <button onclick="changePage(-1)" class="px-2 py-1 bg-white border border-gray-300 rounded text-xs hover:bg-gray-50">&larr; Prev</button>
-                        <span id="page-indicator" class="text-xs text-gray-600 font-medium">Offset: 0</span>
-                        <button onclick="changePage(1)" class="px-2 py-1 bg-white border border-gray-300 rounded text-xs hover:bg-gray-50">Next &rarr;</button>
+                        <button onclick="changePage(-1)" class="px-2 py-0.5 bg-white border border-gray-300 rounded hover:bg-gray-50">&larr; Prev</button>
+                        <span id="page-indicator" class="text-gray-600 font-medium">Offset: 0</span>
+                        <button onclick="changePage(1)" class="px-2 py-0.5 bg-white border border-gray-300 rounded hover:bg-gray-50">Next &rarr;</button>
                     </div>
                 </div>
-                <div class="overflow-x-auto min-h-[400px] max-h-[500px] overflow-y-auto">
-                    <table class="w-full text-left text-xs">
-                        <thead class="bg-gray-50 text-gray-500 uppercase font-semibold sticky top-0 border-b border-gray-100">
+                <div class="overflow-x-auto min-h-[380px] max-h-[480px] overflow-y-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-gray-100 text-gray-600 uppercase font-semibold sticky top-0 border-b border-gray-300">
                             <tr>
-                                <th class="px-3 py-2.5">Time / Number</th>
-                                <th class="px-3 py-2.5">CLI & Range</th>
-                                <th class="px-3 py-2.5 text-right">Actions</th>
+                                <th class="px-2 py-2 border-r border-gray-200">Date / Number</th>
+                                <th class="px-2 py-2 border-r border-gray-200">Range</th>
+                                <th class="px-2 py-2 text-right">Action</th>
                             </tr>
                         </thead>
-                        <tbody id="ranges-table-body" class="divide-y divide-gray-100">
+                        <tbody id="ranges-table-body" class="divide-y divide-gray-200">
                             <tr><td colspan="3" class="text-center py-10 text-gray-400">Loading numbers...</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- Section 2: Permanent Report Section (Visible to Everyone, Never Deleted) -->
-            <div class="bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col">
-                <div class="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                    <h2 class="text-xs font-bold text-gray-700 uppercase tracking-wider">Permanent Report Section</h2>
-                    <span id="tracked-count" class="text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">0 Reports</span>
+            <!-- Section 2: Report Section -->
+            <div class="bg-white border border-gray-300 rounded shadow-sm flex flex-col">
+                <div class="px-3 py-2 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                    <h2 class="font-bold text-gray-700 uppercase">Report</h2>
+                    <span id="tracked-count" class="font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">0 Reports</span>
                 </div>
-                <div class="overflow-x-auto min-h-[400px] max-h-[500px] overflow-y-auto">
-                    <table class="w-full text-left text-xs">
-                        <thead class="bg-gray-50 text-gray-500 uppercase font-semibold sticky top-0 border-b border-gray-100">
+                <div class="overflow-x-auto min-h-[380px] max-h-[480px] overflow-y-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-gray-100 text-gray-600 uppercase font-semibold sticky top-0 border-b border-gray-300">
                             <tr>
-                                <th class="px-3 py-2.5">Copied Number</th>
-                                <th class="px-3 py-2.5">Incoming CLI</th>
-                                <th class="px-3 py-2.5">Range Name</th>
-                                <th class="px-3 py-2.5">Received Time</th>
+                                <th class="px-2 py-2 border-r border-gray-200">Copied Number</th>
+                                <th class="px-2 py-2 border-r border-gray-200">Incoming CLI</th>
+                                <th class="px-2 py-2 border-r border-gray-200">Range Name</th>
+                                <th class="px-2 py-2">Received Time</th>
                             </tr>
                         </thead>
-                        <tbody id="report-table-body" class="divide-y divide-gray-100">
+                        <tbody id="report-table-body" class="divide-y divide-gray-200">
                             <tr>
-                                <td colspan="4" class="text-center py-10 text-gray-400 text-xs">Waiting for new messages on copied numbers...</td>
+                                <td colspan="4" class="text-center py-10 text-gray-400">Waiting for new messages on copied numbers...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -114,10 +112,10 @@
         const limit = 25;
         const BACKEND_URL = "https://lamix-backend-51vs.onrender.com";
 
-        // Load personal tracked numbers from localStorage so they never reset on reload
+        // Personal tracking map using unique row key so duplicate numbers don't conflict
         let trackedMap = {};
         try {
-            const localSaved = localStorage.getItem('lamix_personal_tracked');
+            const localSaved = localStorage.getItem('lamix_personal_tracked_v3');
             if (localSaved) {
                 trackedMap = JSON.parse(localSaved);
             }
@@ -125,12 +123,11 @@
             console.error(e);
         }
 
-        // Initialize Firebase Listeners for Global Permanent Reports
         function initFirebase() {
             const checkInterval = setInterval(() => {
                 if (window.db && window.ref && window.onValue) {
                     clearInterval(checkInterval);
-                    const reportsRef = window.ref(window.db, 'global_permanent_reports');
+                    const reportsRef = window.ref(window.db, 'global_permanent_reports_v3');
                     window.onValue(reportsRef, (snapshot) => {
                         globalReportsMap = snapshot.val() || {};
                         renderReports();
@@ -191,21 +188,23 @@
             }
 
             rows.forEach((row, index) => {
-                const isTracked = trackedMap.hasOwnProperty(row.receivedNumber);
+                const rowKey = `${row.receivedNumber}_${row.receivedAt}`;
+                const isTracked = trackedMap.hasOwnProperty(rowKey);
+
                 tbody.innerHTML += `
                     <tr class="hover:bg-gray-50 transition">
-                        <td class="px-3 py-2.5">
-                            <div class="font-mono font-medium text-gray-900">${row.receivedNumber}</div>
-                            <div class="text-[10px] text-gray-400">${formatISTTime(row.receivedAt)}</div>
+                        <td class="px-2 py-2 border-r border-gray-200">
+                            <div class="font-mono font-semibold text-gray-900">${row.receivedNumber}</div>
+                            <div class="text-[10px] text-gray-500">${formatISTTime(row.receivedAt)}</div>
                         </td>
-                        <td class="px-3 py-2.5">
-                            <div class="text-gray-800 font-medium">${row.senderCli}</div>
-                            <div class="text-[10px] text-gray-400">${row.rangeName}</div>
+                        <td class="px-2 py-2 border-r border-gray-200">
+                            <div class="text-gray-800 font-medium">${row.rangeName || 'N/A'}</div>
+                            <div class="text-[10px] text-gray-500">CLI: ${row.senderCli}</div>
                         </td>
-                        <td class="px-3 py-2.5 text-right space-x-1">
-                            <button id="copy-btn-${index}" onclick="copyNumber('${row.receivedNumber}', ${index})" 
-                                class="px-2.5 py-1 rounded text-[11px] font-medium border transition ${isTracked ? 'bg-green-50 text-green-700 border-green-300' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}">
-                                ${isTracked ? '✓ Copied' : 'Copy'}
+                        <td class="px-2 py-2 text-right">
+                            <button onclick="toggleTrack('${rowKey}', '${row.receivedNumber}')" 
+                                class="px-2.5 py-1 rounded text-[11px] font-medium border transition ${isTracked ? 'bg-green-600 text-white border-green-700' : 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700'}">
+                                ${isTracked ? '✓ Tracked' : 'Copy'}
                             </button>
                         </td>
                     </tr>
@@ -213,7 +212,7 @@
             });
         }
 
-        window.copyNumber = async function(number, index) {
+        window.toggleTrack = async function(rowKey, number) {
             try {
                 await navigator.clipboard.writeText(number);
             } catch (err) {
@@ -225,34 +224,33 @@
                 document.body.removeChild(textArea);
             }
 
-            // Save tracking personally so it never resets on page refresh
-            if (!trackedMap[number]) {
-                trackedMap[number] = Date.now();
-                localStorage.setItem('lamix_personal_tracked', JSON.stringify(trackedMap));
+            if (trackedMap.hasOwnProperty(rowKey)) {
+                delete trackedMap[rowKey];
+            } else {
+                trackedMap[rowKey] = Date.now();
             }
 
+            localStorage.setItem('lamix_personal_tracked_v3', JSON.stringify(trackedMap));
             renderRanges(allRowsData);
             checkForNewMatches(allRowsData);
         }
 
         function checkForNewMatches(rows) {
             rows.forEach(row => {
-                if (trackedMap.hasOwnProperty(row.receivedNumber)) {
-                    const copyTime = trackedMap[row.receivedNumber];
+                const rowKey = `${row.receivedNumber}_${row.receivedAt}`;
+                if (trackedMap.hasOwnProperty(rowKey)) {
+                    const copyTime = trackedMap[rowKey];
                     const msgTime = new Date(row.receivedAt).getTime();
                     if (msgTime > copyTime) {
-                        // Unique identifier for this SMS report
                         const reportId = `${row.receivedNumber}_${msgTime}`.replace(/[\.#$\/\[\]]/g, '_');
-                        
-                        // If not already in global Firebase reports, push it permanently
                         if (!globalReportsMap[reportId] && window.db && window.ref && window.set) {
                             const reportData = {
                                 receivedNumber: row.receivedNumber,
                                 senderCli: row.senderCli,
-                                rangeName: row.rangeName,
+                                rangeName: row.rangeName || 'N/A',
                                 receivedAt: row.receivedAt
                             };
-                            window.set(window.ref(window.db, `global_permanent_reports/${reportId}`), reportData);
+                            window.set(window.ref(window.db, `global_permanent_reports_v3/${reportId}`), reportData);
                         }
                     }
                 }
@@ -267,27 +265,25 @@
             trackedCountEl.innerText = `${reportsArray.length} Reports`;
 
             if (reportsArray.length === 0) {
-                reportTbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-gray-400 text-xs">Waiting for new messages on copied numbers...</td></tr>`;
+                reportTbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-gray-400">Waiting for new messages on copied numbers...</td></tr>`;
                 return;
             }
 
             reportTbody.innerHTML = '';
-            // Sort newest first
             reportsArray.sort((a, b) => new Date(b.receivedAt) - new Date(a.receivedAt));
 
             reportsArray.forEach(row => {
                 reportTbody.innerHTML += `
                     <tr class="hover:bg-gray-50 transition bg-green-50/20">
-                        <td class="px-3 py-2.5 font-mono font-semibold text-green-800">${row.receivedNumber}</td>
-                        <td class="px-3 py-2.5 font-medium text-gray-800">${row.senderCli}</td>
-                        <td class="px-3 py-2.5 text-gray-600 text-[11px]">${row.rangeName}</td>
-                        <td class="px-3 py-2.5 text-green-700 font-mono text-[11px]">${formatISTTime(row.receivedAt)}</td>
+                        <td class="px-2 py-2 border-r border-gray-200 font-mono font-semibold text-green-800">${row.receivedNumber}</td>
+                        <td class="px-2 py-2 border-r border-gray-200 font-medium text-gray-800">${row.senderCli}</td>
+                        <td class="px-2 py-2 border-r border-gray-200 text-gray-600 text-[11px]">${row.rangeName}</td>
+                        <td class="px-2 py-2 text-green-700 font-mono text-[11px]">${formatISTTime(row.receivedAt)}</td>
                     </tr>
                 `;
             });
         }
 
-        // Initial fetch and auto-refresh every 5 seconds
         fetchCDRs();
         setInterval(fetchCDRs, 5000);
     </script>
