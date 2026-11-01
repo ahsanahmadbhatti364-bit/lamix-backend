@@ -75,7 +75,7 @@
                             </tr>
                         </thead>
                         <tbody id="ranges-table-body" class="divide-y divide-gray-100">
-                            <!-- Populated dynamically -->
+                            <tr><td colspan="3" class="text-center py-10 text-gray-400">Loading numbers...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -113,21 +113,28 @@
         let allRowsData = [];
         let trackedMap = {};
         let currentOffset = 0;
+        let isFirebaseLoaded = false;
         const limit = 25;
         const BACKEND_URL = "https://lamix-backend-51vs.onrender.com";
 
-        setTimeout(() => {
+        // Initialize Firebase listener first
+        function initFirebase() {
             if (window.db && window.ref && window.onValue) {
                 const trackedRef = window.ref(window.db, 'shared_tracked_map');
                 window.onValue(trackedRef, (snapshot) => {
                     trackedMap = snapshot.val() || {};
+                    isFirebaseLoaded = true;
+                    // Refresh UI once Firebase data is safely loaded
                     if (allRowsData.length > 0) {
                         renderRanges(allRowsData);
                         checkReports(allRowsData);
                     }
                 });
+            } else {
+                setTimeout(initFirebase, 300);
             }
-        }, 1200);
+        }
+        initFirebase();
 
         window.fetchCDRs = async function() {
             try {
@@ -136,8 +143,11 @@
                 const data = await res.json();
                 if (data && data.rows) {
                     allRowsData = data.rows;
-                    renderRanges(allRowsData);
-                    checkReports(allRowsData);
+                    // Render only if Firebase has responded to prevent clearing data prematurely
+                    if (isFirebaseLoaded) {
+                        renderRanges(allRowsData);
+                        checkReports(allRowsData);
+                    }
                 }
             } catch (err) {
                 console.error('Fetch error:', err);
@@ -164,6 +174,11 @@
         function renderRanges(rows) {
             const tbody = document.getElementById('ranges-table-body');
             tbody.innerHTML = '';
+
+            if(!rows || rows.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="text-center py-10 text-gray-400">No numbers found.</td></tr>`;
+                return;
+            }
 
             rows.forEach((row, index) => {
                 const isTracked = trackedMap.hasOwnProperty(row.receivedNumber);
@@ -273,7 +288,8 @@
             });
         }
 
-        setInterval(fetchCDRs, 4000);
+        // Poll every 5 seconds
+        setInterval(fetchCDRs, 5000);
         fetchCDRs();
     </script>
 </body>
