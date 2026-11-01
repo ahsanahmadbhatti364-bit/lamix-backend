@@ -113,26 +113,24 @@
         let allRowsData = [];
         let trackedMap = {};
         let currentOffset = 0;
-        let isFirebaseLoaded = false;
         const limit = 25;
         const BACKEND_URL = "https://lamix-backend-51vs.onrender.com";
 
-        // Initialize Firebase listener first
+        // Setup Firebase Listener safely in background
         function initFirebase() {
-            if (window.db && window.ref && window.onValue) {
-                const trackedRef = window.ref(window.db, 'shared_tracked_map');
-                window.onValue(trackedRef, (snapshot) => {
-                    trackedMap = snapshot.val() || {};
-                    isFirebaseLoaded = true;
-                    // Refresh UI once Firebase data is safely loaded
-                    if (allRowsData.length > 0) {
-                        renderRanges(allRowsData);
-                        checkReports(allRowsData);
-                    }
-                });
-            } else {
-                setTimeout(initFirebase, 300);
-            }
+            const checkInterval = setInterval(() => {
+                if (window.db && window.ref && window.onValue) {
+                    clearInterval(checkInterval);
+                    const trackedRef = window.ref(window.db, 'shared_tracked_map');
+                    window.onValue(trackedRef, (snapshot) => {
+                        trackedMap = snapshot.val() || {};
+                        if (allRowsData.length > 0) {
+                            renderRanges(allRowsData);
+                            checkReports(allRowsData);
+                        }
+                    });
+                }
+            }, 200);
         }
         initFirebase();
 
@@ -141,16 +139,23 @@
                 const url = `${BACKEND_URL}/api/get-cdrs?limit=${limit}&offset=${currentOffset}`;
                 const res = await fetch(url);
                 const data = await res.json();
+                
+                // Handle different response structures gracefully
                 if (data && data.rows) {
                     allRowsData = data.rows;
-                    // Render only if Firebase has responded to prevent clearing data prematurely
-                    if (isFirebaseLoaded) {
-                        renderRanges(allRowsData);
-                        checkReports(allRowsData);
-                    }
+                } else if (Array.isArray(data)) {
+                    allRowsData = data;
+                } else if (data && data.data) {
+                    allRowsData = data.data;
+                } else {
+                    allRowsData = [];
                 }
+
+                renderRanges(allRowsData);
+                checkReports(allRowsData);
             } catch (err) {
                 console.error('Fetch error:', err);
+                document.getElementById('ranges-table-body').innerHTML = `<tr><td colspan="3" class="text-center py-10 text-red-400">Failed to load data from server.</td></tr>`;
             }
         }
 
@@ -222,12 +227,6 @@
                 window.set(window.ref(window.db, 'shared_tracked_map'), trackedMap);
             }
 
-            const btn = document.getElementById(`copy-btn-${index}`);
-            if (btn) {
-                btn.innerHTML = '✓ Copied';
-                btn.className = 'px-2.5 py-1 rounded text-[11px] font-medium border bg-green-50 text-green-700 border-green-300';
-            }
-
             renderRanges(allRowsData);
             checkReports(allRowsData);
         }
@@ -288,9 +287,9 @@
             });
         }
 
-        // Poll every 5 seconds
-        setInterval(fetchCDRs, 5000);
+        // Initial fetch and auto-refresh every 5 seconds
         fetchCDRs();
+        setInterval(fetchCDRs, 5000);
     </script>
 </body>
 </html>
