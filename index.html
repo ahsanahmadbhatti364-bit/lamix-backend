@@ -41,7 +41,7 @@
             </div>
             <div class="flex items-center gap-2">
                 <span class="px-2 py-1 bg-blue-600 text-white font-semibold rounded text-[11px]">SMS Test Report</span>
-                <span class="px-2 py-1 bg-gray-100 text-gray-700 border border-gray-300 rounded text-[11px]">SMS Test Numbers</span>
+                <span class="px-2 py-1 bg-blue-50 text-blue-700 border border-blue-200 font-semibold rounded text-[11px]">Report</span>
                 <button onclick="fetchCDRs()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded font-medium transition flex items-center gap-1 shadow-sm">
                     ↻ Refresh
                 </button>
@@ -112,7 +112,6 @@
         const limit = 25;
         const BACKEND_URL = "https://lamix-backend-51vs.onrender.com";
 
-        // Personal tracking map using unique row key so duplicate numbers don't conflict
         let trackedMap = {};
         try {
             const localSaved = localStorage.getItem('lamix_personal_tracked_v3');
