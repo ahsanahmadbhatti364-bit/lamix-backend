@@ -8,7 +8,7 @@
     <!-- Firebase SDK Modular v10 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAyOW3nIcnzfD5AHImlc4jNy_ZtFH8Gy3Q",
@@ -27,6 +27,7 @@
         window.db = db;
         window.ref = ref;
         window.set = set;
+        window.push = push;
         window.onValue = onValue;
     </script>
 </head>
@@ -37,7 +38,7 @@
         <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-gray-200 rounded-lg p-4 shadow-sm gap-3">
             <div>
                 <h1 class="text-lg font-bold text-gray-900 tracking-tight">Recent SMS and Ranges</h1>
-                <p class="text-xs text-gray-500">Real-time synchronized tracking dashboard.</p>
+                <p class="text-xs text-gray-500">Live synchronized dashboard & permanent reports.</p>
             </div>
             <div class="flex items-center gap-2">
                 <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200">
@@ -45,9 +46,6 @@
                 </span>
                 <button onclick="fetchCDRs()" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-xs font-medium transition shadow-sm">
                     Refresh
-                </button>
-                <button onclick="resetAllTracking()" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1.5 rounded text-xs font-medium transition">
-                    Reset All Tracking
                 </button>
             </div>
         </header>
@@ -81,11 +79,11 @@
                 </div>
             </div>
 
-            <!-- Section 2: Report Section -->
+            <!-- Section 2: Permanent Report Section (Visible to Everyone, Never Deleted) -->
             <div class="bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col">
                 <div class="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                    <h2 class="text-xs font-bold text-gray-700 uppercase tracking-wider">Report Section</h2>
-                    <span id="tracked-count" class="text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">0 Tracked</span>
+                    <h2 class="text-xs font-bold text-gray-700 uppercase tracking-wider">Permanent Report Section</h2>
+                    <span id="tracked-count" class="text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">0 Reports</span>
                 </div>
                 <div class="overflow-x-auto min-h-[400px] max-h-[500px] overflow-y-auto">
                     <table class="w-full text-left text-xs">
@@ -111,23 +109,31 @@
 
     <script type="module">
         let allRowsData = [];
-        let trackedMap = {};
         let currentOffset = 0;
+        let globalReportsMap = {};
         const limit = 25;
         const BACKEND_URL = "https://lamix-backend-51vs.onrender.com";
 
-        // Setup Firebase Listener safely in background
+        // Load personal tracked numbers from localStorage so they never reset on reload
+        let trackedMap = {};
+        try {
+            const localSaved = localStorage.getItem('lamix_personal_tracked');
+            if (localSaved) {
+                trackedMap = JSON.parse(localSaved);
+            }
+        } catch(e) {
+            console.error(e);
+        }
+
+        // Initialize Firebase Listeners for Global Permanent Reports
         function initFirebase() {
             const checkInterval = setInterval(() => {
                 if (window.db && window.ref && window.onValue) {
                     clearInterval(checkInterval);
-                    const trackedRef = window.ref(window.db, 'shared_tracked_map');
-                    window.onValue(trackedRef, (snapshot) => {
-                        trackedMap = snapshot.val() || {};
-                        if (allRowsData.length > 0) {
-                            renderRanges(allRowsData);
-                            checkReports(allRowsData);
-                        }
+                    const reportsRef = window.ref(window.db, 'global_permanent_reports');
+                    window.onValue(reportsRef, (snapshot) => {
+                        globalReportsMap = snapshot.val() || {};
+                        renderReports();
                     });
                 }
             }, 200);
@@ -140,7 +146,6 @@
                 const res = await fetch(url);
                 const data = await res.json();
                 
-                // Handle different response structures gracefully
                 if (data && data.rows) {
                     allRowsData = data.rows;
                 } else if (Array.isArray(data)) {
@@ -152,7 +157,7 @@
                 }
 
                 renderRanges(allRowsData);
-                checkReports(allRowsData);
+                checkForNewMatches(allRowsData);
             } catch (err) {
                 console.error('Fetch error:', err);
                 document.getElementById('ranges-table-body').innerHTML = `<tr><td colspan="3" class="text-center py-10 text-red-400">Failed to load data from server.</td></tr>`;
@@ -202,7 +207,6 @@
                                 class="px-2.5 py-1 rounded text-[11px] font-medium border transition ${isTracked ? 'bg-green-50 text-green-700 border-green-300' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}">
                                 ${isTracked ? '✓ Copied' : 'Copy'}
                             </button>
-                            ${isTracked ? `<button onclick="resetSingleTracking('${row.receivedNumber}')" class="px-2 py-1 rounded text-[11px] font-medium bg-red-50 text-red-600 border border-red-200 hover:bg-red-100">Reset</button>` : ''}
                         </td>
                     </tr>
                 `;
@@ -221,61 +225,57 @@
                 document.body.removeChild(textArea);
             }
 
-            trackedMap[number] = Date.now();
-
-            if (window.db && window.ref && window.set) {
-                window.set(window.ref(window.db, 'shared_tracked_map'), trackedMap);
+            // Save tracking personally so it never resets on page refresh
+            if (!trackedMap[number]) {
+                trackedMap[number] = Date.now();
+                localStorage.setItem('lamix_personal_tracked', JSON.stringify(trackedMap));
             }
 
             renderRanges(allRowsData);
-            checkReports(allRowsData);
+            checkForNewMatches(allRowsData);
         }
 
-        window.resetSingleTracking = async function(number) {
-            delete trackedMap[number];
-            if (window.db && window.ref && window.set) {
-                window.set(window.ref(window.db, 'shared_tracked_map'), trackedMap);
-            }
-            renderRanges(allRowsData);
-            checkReports(allRowsData);
-        }
-
-        window.resetAllTracking = async function() {
-            if (confirm("Reset tracking for all numbers?")) {
-                trackedMap = {};
-                if (window.db && window.ref && window.set) {
-                    window.set(window.ref(window.db, 'shared_tracked_map'), null);
-                }
-                renderRanges(allRowsData);
-                checkReports(allRowsData);
-            }
-        }
-
-        function checkReports(rows) {
-            const reportTbody = document.getElementById('report-table-body');
-            const trackedCountEl = document.getElementById('tracked-count');
-            
-            const trackedKeys = Object.keys(trackedMap);
-            trackedCountEl.innerText = `${trackedKeys.length} Tracked`;
-
-            const matchedReports = [];
+        function checkForNewMatches(rows) {
             rows.forEach(row => {
                 if (trackedMap.hasOwnProperty(row.receivedNumber)) {
                     const copyTime = trackedMap[row.receivedNumber];
                     const msgTime = new Date(row.receivedAt).getTime();
                     if (msgTime > copyTime) {
-                        matchedReports.push(row);
+                        // Unique identifier for this SMS report
+                        const reportId = `${row.receivedNumber}_${msgTime}`.replace(/[\.#$\/\[\]]/g, '_');
+                        
+                        // If not already in global Firebase reports, push it permanently
+                        if (!globalReportsMap[reportId] && window.db && window.ref && window.set) {
+                            const reportData = {
+                                receivedNumber: row.receivedNumber,
+                                senderCli: row.senderCli,
+                                rangeName: row.rangeName,
+                                receivedAt: row.receivedAt
+                            };
+                            window.set(window.ref(window.db, `global_permanent_reports/${reportId}`), reportData);
+                        }
                     }
                 }
             });
+        }
 
-            if (matchedReports.length === 0) {
+        function renderReports() {
+            const reportTbody = document.getElementById('report-table-body');
+            const trackedCountEl = document.getElementById('tracked-count');
+            
+            const reportsArray = Object.values(globalReportsMap);
+            trackedCountEl.innerText = `${reportsArray.length} Reports`;
+
+            if (reportsArray.length === 0) {
                 reportTbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-gray-400 text-xs">Waiting for new messages on copied numbers...</td></tr>`;
                 return;
             }
 
             reportTbody.innerHTML = '';
-            matchedReports.forEach(row => {
+            // Sort newest first
+            reportsArray.sort((a, b) => new Date(b.receivedAt) - new Date(a.receivedAt));
+
+            reportsArray.forEach(row => {
                 reportTbody.innerHTML += `
                     <tr class="hover:bg-gray-50 transition bg-green-50/20">
                         <td class="px-3 py-2.5 font-mono font-semibold text-green-800">${row.receivedNumber}</td>
