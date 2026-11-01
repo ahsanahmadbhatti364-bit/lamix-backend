@@ -3,7 +3,14 @@ const axios = require('axios');
 const cors = require('cors');
 
 const app = express();
-app.use(cors());
+
+// Sabhi origins ke liye CORS open kar rahe hain taaki GitHub Pages se request block na ho
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type']
+}));
+
 app.use(express.json());
 
 const LAMIX_API_URL = 'https://panel.lamix.org/api/test-cdrs';
@@ -29,7 +36,7 @@ app.get('/api/get-cdrs', async (req, res) => {
         res.json(response.data);
     } catch (error) {
         console.error('Error fetching Lamix panel data:', error.message);
-        res.status(500).json({ error: 'Failed to fetch data from panel' });
+        res.status(500).json({ error: 'Failed to fetch data from panel', details: error.message });
     }
 });
 
